@@ -124,7 +124,10 @@ function isValidWord(word) {
   if (/[^aeiou]{5,}/.test(letters)) return false;
 
   // Block repeated patterns
-  if (/^(.+?)\1+$/.test(letters)) return false;
+  if (/(\w{2,})\1/.test(letters)) return false;
+
+   // Block alternating patterns like "ababa"
+   if (/^(.)(.)\1\2/.test(letters)) return false;
 
   return true;
 }
