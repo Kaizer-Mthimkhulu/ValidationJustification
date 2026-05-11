@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Refactored Validation Form</title>
+<title>Advanced Validation Form</title>
 
 <style>
   body {
@@ -30,6 +30,7 @@
   .input-message {
     color: red;
     margin-top: 6px;
+    font-size: 13px;
   }
 
   button {
@@ -54,10 +55,8 @@
   <div class="TextField" id="field">
     <label>
       <strong>Reason / Comment</strong>
-
       <input id="input" type="text"
         placeholder="e.g. Updating my number to 0712334356" />
-
       <div id="error" class="input-message" hidden></div>
     </label>
   </div>
@@ -78,7 +77,7 @@ const MIN_LEN = 5;
 const MAX_LEN = 255;
 
 const SENTENCE_REGEX =
-/^[A-Za-z0-9][A-Za-z0-9.,;:_()'"-]*(?:\s+[A-Za-z0-9.,;:_()'"-]+)+[.!?]?$/;
+/^[A-Za-z0-9][A-Za-z0-9@#.,;:_()'"-]*(?:\s+[A-Za-z0-9@#.,;:_()'"-]+)+[.!?]?$/;
 
 // ============================
 // UTILITIES
@@ -89,15 +88,19 @@ function normalize(text) {
 }
 
 function splitWords(text) {
-  return text.toLowerCase().split(" ");
-}
-
-function isNumber(word) {
-  return /^\d{5,}$/.test(word); // phone numbers / IDs
+  return text.toLowerCase().split(/\s+/);
 }
 
 function cleanWord(word) {
   return word.replace(/[^a-z]/g, "");
+}
+
+function isNumber(word) {
+  return /^\d{5,}$/.test(word);
+}
+
+function isSingleLetter(word) {
+  return /^[a-z]$/i.test(word);
 }
 
 // ============================
@@ -106,47 +109,39 @@ function cleanWord(word) {
 
 function isValidWord(word) {
   const letters = cleanWord(word);
-
-  // Skip empty or symbols-only words
   if (!letters) return false;
 
-  // Allow short real words (to, of, as, my)
   if (letters.length === 1) return false;
   if (letters.length === 2) return true;
 
-  // Vowel balance
-  const vowels = letters.match(/[aeiou]/g) || [];
+  const vowels = letters.match(/[aeiouy]/g) || [];
   const ratio = vowels.length / letters.length;
 
   if (ratio < 0.2) return false;
 
-  // Block consonant spam
-  if (/[^aeiou]{5,}/.test(letters)) return false;
-
-  // Block repeated patterns
+  if (/[^aeiouy]{5,}/.test(letters)) return false;
   if (/(\w{2,})\1/.test(letters)) return false;
-
-   // Block alternating patterns like "ababa"
-   if (/^(.)(.)\1\2/.test(letters)) return false;
+  if (/^(.)(.)\1\2/.test(letters)) return false;
 
   return true;
 }
 
 // ============================
-// MAIN INTELLIGENCE
+// HUMAN TEXT VALIDATION
 // ============================
 
 function isLikelyHumanText(text) {
   const words = splitWords(text);
 
   let valid = 0;
-
+  let invalid = 0;
   let singleLetterCount = 0;
 
   for (let word of words) {
 
-    if (/^[a-z]$/i.test(word)) {
+    if (isSingleLetter(word)) {
       singleLetterCount++;
+      if (singleLetterCount > 2) return false;
       continue;
     }
 
@@ -157,60 +152,61 @@ function isLikelyHumanText(text) {
 
     if (isValidWord(word)) {
       valid++;
+    } else {
+      invalid++;
+      if (invalid > Math.floor(words.length / 2)) return false;
     }
   }
 
-  // Block spam like "a b c d e"
-  if (singleLetterCount > 2) return false;
-
-  // Require meaningful content
   if (valid < 2) return false;
+  if (valid / words.length < 0.6) return false;
 
-  // Balance rule
-  if (valid / words.length < 0.5) return false;
+  // Repeated word control (balanced)
+  const freq = {};
+  for (let w of words) {
+    freq[w] = (freq[w] || 0) + 1;
+  }
+
+  if (Object.values(freq).some(count => count > Math.max(2, words.length * 0.6))) {
+    return false;
+  }
 
   return true;
 }
 
 // ============================
-// VALIDATION PIPELINE
+// MAIN VALIDATION
 // ============================
 
 function validateInput(value) {
   const input = normalize(value);
 
-  if (!input) {
-    return "Field cannot be empty.";
-  }
+  if (!input) return "Field cannot be empty.";
 
-  if (input.length < MIN_LEN) {
+  if (input.length < MIN_LEN)
     return `Must be at least ${MIN_LEN} characters.`;
-  }
 
-  if (input.length > MAX_LEN) {
+  if (input.length > MAX_LEN)
     return `Must not exceed ${MAX_LEN} characters.`;
-  }
 
-  if (!SENTENCE_REGEX.test(input)) {
+  if (!SENTENCE_REGEX.test(input))
     return "Enter a valid sentence.";
-  }
 
-  if (!isLikelyHumanText(input)) {
+  if (!isLikelyHumanText(input))
     return "Please enter meaningful text.";
-  }
 
-  return null; // valid
+  return null;
 }
 
 // ============================
-// UI HANDLING
+// UI LOGIC
 // ============================
 
 const inputEl = document.getElementById("input");
 const errorEl = document.getElementById("error");
 const fieldEl = document.getElementById("field");
-const formEl = document.getElementById("form");
 const successEl = document.getElementById("success");
+const formEl = document.getElementById("form");
 
 function showError(msg) {
   errorEl.textContent = msg;
@@ -223,7 +219,7 @@ function clearError() {
   fieldEl.classList.remove("error");
 }
 
-function validateAndDisplay(value) {
+function validateAndRender(value) {
   const error = validateInput(value);
 
   if (error) {
@@ -240,7 +236,7 @@ function validateAndDisplay(value) {
 // ============================
 
 inputEl.addEventListener("input", e => {
-  validateAndDisplay(e.target.value);
+  validateAndRender(e.target.value);
   successEl.hidden = true;
 });
 
@@ -249,7 +245,7 @@ formEl.addEventListener("submit", e => {
 
   const value = inputEl.value;
 
-  if (!validateAndDisplay(value)) {
+  if (!validateAndRender(value)) {
     successEl.hidden = true;
     return;
   }
@@ -259,7 +255,6 @@ formEl.addEventListener("submit", e => {
   successEl.hidden = false;
   inputEl.value = "";
 });
-
 </script>
 
 </body>
