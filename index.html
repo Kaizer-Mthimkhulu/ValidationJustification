@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Form Validation Demo</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 40px;
+      background: #f5f5f5;
+    }
+
+    .TextField {
+      max-width: 400px;
+      margin-bottom: 20px;
+    }
+
+    .label-text {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      border: 2px solid #ccc;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    .error input {
+      border-color: red;
+    }
+
+    .input-message {
+      margin-top: 8px;
+      color: red;
+      font-size: 13px;
+    }
+
+    button {
+      padding: 10px 20px;
+      border: none;
+      background: #0078d4;
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #005fa3;
+    }
+
+    .success {
+      margin-top: 15px;
+      color: green;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+
+  <form id="myForm">
+    <div class="TextField" id="field">
+      <label>
+        <span class="label-text">Reason / Comment</span>
+
+        <input id="example" type="text"
+          placeholder="e.g. Updating my number to 0712334356" />
+
+        <div id="example-error" class="input-message" hidden>
+          Field cannot be blank
+        </div>
+      </label>
+    </div>
+
+    <button type="submit">Submit</button>
+
+    <div id="successMessage" class="success" hidden>
+      ✅ Form submitted successfully!
+    </div>
+  </form>
+
+  <script>
+    const inputEl = document.getElementById("example");
+    const errorEl = document.getElementById("example-error");
+    const fieldEl = document.getElementById("field");
+    const formEl = document.getElementById("myForm");
+    const successEl = document.getElementById("successMessage");
+
+    const MIN_LEN = 5;
+    const MAX_LEN = 255;
+
+    const JUSTIFICATION_REGEX =
+      /^[A-Za-z0-9][A-Za-z0-9.,;:_()'"-]*(?:\s+[A-Za-z0-9.,;:_()'"-]+)+$/;
+
+    /* SMART HUMAN TEXT + NUMBER SUPPORT */
+    function isLikelyHumanText(text) {
+    const cleaned = text.toLowerCase().trim();
+    const words = cleaned.split(/\s+/);
+
+    let validWordCount = 0;
+
+    for (let word of words) {
+
+        // Allow numbers (phone numbers, IDs)
+        if (/^\d{5,}$/.test(word)) {
+        validWordCount++;
+        continue;
+        }
+
+        const letters = word.replace(/[^a-z]/g, "");
+        if (letters.length < 3) continue;
+
+        // Must contain vowels
+        const vowelCount = (letters.match(/[aeiou]/g) || []).length;
+        const vowelRatio = vowelCount / letters.length;
+
+        if (vowelRatio < 0.3) continue;
+
+        // Block weird consonant clusters (e.g. "kjqwbx")
+        if (/[^aeiou]{4,}/.test(letters)) continue;
+
+        // Block repeating patterns like "asdadasd"
+        if (/^(.+?)\1+$/.test(letters)) continue;
+
+        // Must look somewhat like real word
+        if (!/[aeiou].*[bcdfg]/.test(letters)) continue;
+
+        validWordCount++;
+    }
+
+    // Require at least 2 valid components
+    if (validWordCount < 2) return false;
+
+    // At least 60% must be valid 
+    if (validWordCount / words.length < 0.6) return false;
+
+    return true;
+    }
+
+    function showError(message) {
+      errorEl.textContent = message;
+      errorEl.hidden = false;
+      fieldEl.classList.add("error");
+    }
+
+    function hideError() {
+      errorEl.hidden = true;
+      fieldEl.classList.remove("error");
+    }
+
+    function validate(value) {
+      const trimmed = value.trim();
+
+      if (trimmed === "") {
+        showError("Field cannot be empty.");
+        return false;
+      }
+
+      if (trimmed.length < MIN_LEN) {
+        showError(`Must be at least ${MIN_LEN} characters.`);
+        return false;
+      }
+
+      if (trimmed.length > MAX_LEN) {
+        showError(`Must not exceed ${MAX_LEN} characters.`);
+        return false;
+      }
+
+      if (!JUSTIFICATION_REGEX.test(trimmed)) {
+        showError("Must contain at least two words or values.");
+        return false;
+      }
+
+      if (!isLikelyHumanText(trimmed)) {
+        showError("Please enter meaningful text.");
+        return false;
+      }
+
+      hideError();
+      return true;
+    }
+
+    // Live validation
+    inputEl.addEventListener("input", (e) => {
+      validate(e.target.value);
+      successEl.hidden = true;
+    });
+
+    // Submit handler
+    formEl.addEventListener("submit", (e) => {
+      e.preventDefault();
+
+      const value = inputEl.value;
+      const isValid = validate(value);
+
+      if (!isValid) {
+        console.log("❌ Submission blocked");
+        successEl.hidden = true;
+        return;
+      }
+
+      console.log("✅ Submitted:", value);
+
+      successEl.hidden = false;
+      inputEl.value = "";
+    });
+  </script>
+
+</body>
+</html>
