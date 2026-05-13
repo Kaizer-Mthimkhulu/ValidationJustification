@@ -1,275 +1,261 @@
-<!-- This is an example file for a basic input element -->
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="Cache-Control" content="no-cache" />
-    <link rel="stylesheet" href="../assets/css/ui-library--v1.css" />
-    <link rel="stylesheet" href="../assets/iframe--v1.css" />
-    <script src="../assets/iframe--v1.min.js"></script>
-  </head>
+<head>
+<meta charset="utf-8" />
+<title>Advanced Validation Form</title>
 
-  <body>
-    <div class="TextField">
-      <label id="example-label" class="input-width-medium no-bottom-margin input-text">
-        <span class="label-text">Basic Example with Validation</span>
+<style>
+  body {
+    font-family: Arial;
+    padding: 40px;
+    background: #f5f5f5;
+  }
 
-        <span class="input-container">
-          <input id="example" type="text" />
+  .TextField {
+    max-width: 420px;
+    margin-bottom: 20px;
+  }
 
-          <div id="example-error" class="input-message" hidden>
-            <div class="input-message__icon"></div>
-            <div class="input-message__text">
-              Field can not be blank
-            </div>
-          </div>
-        </span>
-      </label>
-    </div>
+  input {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid #ccc;
+    border-radius: 6px;
+  }
 
-    <script type="text/javascript">
-      var hasError = false;
-      var originalHeight = document.body.scrollHeight;
+  .error input {
+    border-color: red;
+  }
 
-      /***************************************************************
-       * CONFIG
-       ***************************************************************/
-      var MIN_LEN = 5;
-      var MAX_LEN = 255;
+  .input-message {
+    color: red;
+    margin-top: 6px;
+    font-size: 13px;
+  }
 
-      /***************************************************************
-       * INITIALIZE
-       ***************************************************************/
-      CustomAttribute.onInitialize(function (data) {
-        if (data && data.value) {
-          document.getElementById("example").value = data.value;
-        }
+  button {
+    padding: 10px 20px;
+    background: #0078d4;
+    color: white;
+    border: none;
+    border-radius: 6px;
+  }
 
-        if (data && data.metaData && data.metaData.displayName) {
-          document.getElementsByClassName("label-text")[0].textContent =
-            data.metaData.displayName;
-        }
+  .success {
+    margin-top: 15px;
+    color: green;
+    font-weight: bold;
+  }
+</style>
+</head>
 
-        document.getElementById("example-label").classList.add("required");
+<body>
 
-        if (data && data.value && data.value[0]) {
-          document.getElementById("example-label").classList.remove("required");
-          CustomAttribute.sendAttributeValidation(true);
-        } else {
-          CustomAttribute.sendAttributeValidation(false);
-        }
-      });
+<form id="form">
+  <div class="TextField" id="field">
+    <label>
+      <strong>Reason / Comment</strong>
+      <input id="input" type="text"
+        placeholder="e.g. Updating my number to 0712334356" />
+      <div id="error" class="input-message" hidden></div>
+    </label>
+  </div>
 
-      /***************************************************************
-       * UPDATE EVENTS
-       ***************************************************************/
-      CustomAttribute.onUpdate(function (data) {
-        var example = document.getElementById("example");
-        var thisValue = example.value;
+  <button type="submit">Submit</button>
 
-        var newValue =
-          data &&
-          data.form &&
-          data.form.attributes &&
-          data.form.attributes[CustomAttribute.attribute] &&
-          data.form.attributes[CustomAttribute.attribute][0];
+  <div id="success" class="success" hidden>
+    ✅ Form submitted successfully!
+  </div>
+</form>
 
-        var error =
-          data &&
-          data.form &&
-          data.form.errors &&
-          data.form.errors[CustomAttribute.attribute];
+<script>
+// ============================
+// CONFIG
+// ============================
 
-        if (error) {
-          showErrorState(error.message);
-        }
+const MIN_LEN = 5;
+const MAX_LEN = 255;
 
-        if (thisValue && typeof newValue === "undefined") {
-          example.value = "";
-          hideErrorState();
-          document.getElementById("example-label").classList.add("required");
-        } else if (typeof newValue !== "undefined" && thisValue !== newValue) {
-          example.value = newValue;
-        }
-      });
+const SENTENCE_REGEX =
+/^[A-Za-z0-9][A-Za-z0-9@#.,;:_()'"-]*(?:\s+[A-Za-z0-9@#.,;:_()'"-]+)+[.!?]?$/;
 
-      /***************************************************************
-       * ERROR DISPLAY
-       ***************************************************************/
-      function hideErrorState() {
-        if (!hasError) return;
+// ============================
+// UTILITIES
+// ============================
 
-        document.getElementById("example-error").hidden = true;
-        document.getElementById("example-label").classList.remove("input-message");
-        CustomAttribute.resize(originalHeight);
-        hasError = false;
-      }
+function normalize(text) {
+  return text.trim().replace(/\s+/g, " ");
+}
 
-      function showErrorState(message) {
-        document.getElementById("example-error").hidden = false;
-        document.getElementById("example-label").classList.add("input-message");
+function splitWords(text) {
+  return text.toLowerCase().split(/\s+/);
+}
 
-        if (message) {
-          document.getElementsByClassName("input-message__text")[0].textContent =
-            message;
-        }
+function cleanWord(word) {
+  return word.replace(/[^a-z]/g, "");
+}
 
-        CustomAttribute.resize(originalHeight + 42);
-        hasError = true;
-      }
+function isNumber(word) {
+  return /^\d{5,}$/.test(word);
+}
 
-      /***************************************************************
-       * VALIDATION UTILITIES
-       ***************************************************************/
-      function normalize(text) {
-        return text.trim().replace(/\s+/g, " ");
-      }
+function isSingleLetter(word) {
+  return /^[a-z]$/i.test(word);
+}
 
-      function splitWords(text) {
-        return text.toLowerCase().split(/\s+/);
-      }
+// ============================
+// WORD VALIDATION
+// ============================
 
-      function cleanWord(word) {
-        return word.replace(/[^a-z]/g, "");
-      }
+function isValidWord(word) {
+  const letters = cleanWord(word);
+  if (!letters) return false;
 
-      function isNumber(word) {
-        return /^\d{5,}$/.test(word);
-      }
+  if (letters.length === 1) return false;
+  if (letters.length === 2) return true;
 
-      function isSingleLetter(word) {
-        return /^[a-z]$/i.test(word);
-      }
+  const vowels = letters.match(/[aeiouy]/g) || [];
+  const ratio = vowels.length / letters.length;
 
-      // ============================
-      // WORD VALIDATION
-      // ============================
-      function isValidWord(word) {
-        var letters = cleanWord(word);
-        if (!letters) return false;
+  if (ratio < 0.2) return false;
 
-        if (letters.length === 1) return false;
-        if (letters.length === 2) return true;
+  if (/[^aeiouy]{5,}/.test(letters)) return false;
+  if (/(\w{2,})\1/.test(letters)) return false;
+  if (/^(.)(.)\1\2/.test(letters)) return false;
 
-        var vowels = letters.match(/[aeiouy]/g) || [];
-        var ratio = vowels.length / letters.length;
+  return true;
+}
 
-        if (ratio < 0.2) return false;
-        if (/[^aeiouy]{5,}/.test(letters)) return false;
-        if (/(\w{2,})\1/.test(letters)) return false;
-        if (/^(.)(.)\1\2/.test(letters)) return false;
+// ============================
+// HUMAN TEXT VALIDATION
+// ============================
 
-        return true;
-      }
+function isLikelyHumanText(text) {
+  const words = splitWords(text);
 
-      // ============================
-      // HUMAN TEXT VALIDATION
-      // ============================
-      function isLikelyHumanTextAdvanced(text) {
-        var words = splitWords(text);
+  let valid = 0;
+  let invalid = 0;
+  let singleLetterCount = 0;
 
-        var valid = 0;
-        var invalid = 0;
-        var singleLetterCount = 0;
+  for (let word of words) {
 
-        for (var i = 0; i < words.length; i++) {
-          var word = words[i];
+    if (isSingleLetter(word)) {
+      singleLetterCount++;
+      if (singleLetterCount > 2) return false;
+      continue;
+    }
 
-          if (isSingleLetter(word)) {
-            singleLetterCount++;
-            if (singleLetterCount > 2) return false;
-            continue;
-          }
+    if (isNumber(word)) {
+      valid++;
+      continue;
+    }
 
-          if (isNumber(word)) {
-            valid++;
-            continue;
-          }
+    if (isValidWord(word)) {
+      valid++;
+    } else {
+      invalid++;
+      if (invalid > Math.floor(words.length / 2)) return false;
+    }
+  }
 
-          if (isValidWord(word)) {
-            valid++;
-          } else {
-            invalid++;
-            if (invalid > Math.floor(words.length / 2)) return false;
-          }
-        }
+  if (valid < 2) return false;
+  if (valid / words.length < 0.6) return false;
 
-        if (valid < 2) return false;
-        if (valid / words.length < 0.6) return false;
+  // Repeated word control (balanced)
+  const freq = {};
+  for (let w of words) {
+    freq[w] = (freq[w] || 0) + 1;
+  }
 
-        var freq = {};
-        for (var j = 0; j < words.length; j++) {
-          var w = words[j];
-          freq[w] = (freq[w] || 0) + 1;
-        }
+  if (Object.values(freq).some(count => count > Math.max(2, words.length * 0.6))) {
+    return false;
+  }
 
-        for (var key in freq) {
-          if (freq[key] > Math.max(2, words.length * 0.6)) {
-            return false;
-          }
-        }
+  return true;
+}
 
-        return true;
-      }
+// ============================
+// MAIN VALIDATION
+// ============================
 
-      /***************************************************************
-       * MAIN VALIDATION 
-       ***************************************************************/
-      function validateInput(value) {
-        var input = normalize(value);
+function validateInput(value) {
+  const input = normalize(value);
 
-        if (!input) return "Field cannot be empty.";
+  if (!input) return "Field cannot be empty.";
 
-        if (input.length < MIN_LEN)
-          return "Must be at least " + MIN_LEN + " characters.";
+  if (input.length < MIN_LEN)
+    return `Must be at least ${MIN_LEN} characters.`;
 
-        if (input.length > MAX_LEN)
-          return "Must not exceed " + MAX_LEN + " characters.";
+  if (input.length > MAX_LEN)
+    return `Must not exceed ${MAX_LEN} characters.`;
 
-        if (
-          !/^[A-Za-z0-9][A-Za-z0-9@#.,;:_()'"-]*(?:\s+[A-Za-z0-9@#.,;:_()'"-]+)+[.!?]?$/.test(
-            input
-          )
-        ) {
-          return "Enter a valid sentence.";
-        }
+  if (!SENTENCE_REGEX.test(input))
+    return "Enter a valid sentence.";
 
-        if (!isLikelyHumanTextAdvanced(input))
-          return "Please enter meaningful text.";
+  if (!isLikelyHumanText(input))
+    return "Please enter meaningful text.";
 
-        return null;
-      }
+  return null;
+}
 
-      /***************************************************************
-       * VALIDATION HANDLER
-       ***************************************************************/
-      function handleChange(event) {
-        var rawValue = event.target.value;
+// ============================
+// UI LOGIC
+// ============================
 
-        CustomAttribute.sendAttributeValue(rawValue);
+const inputEl = document.getElementById("input");
+const errorEl = document.getElementById("error");
+const fieldEl = document.getElementById("field");
+const successEl = document.getElementById("success");
+const formEl = document.getElementById("form");
 
-        var error = validateInput(rawValue);
+function showError(msg) {
+  errorEl.textContent = msg;
+  errorEl.hidden = false;
+  fieldEl.classList.add("error");
+}
 
-        if (error) {
-          showErrorState(error);
-          CustomAttribute.sendAttributeValidation(false);
-          document.getElementById("example-label").classList.add("required");
-          return;
-        }
+function clearError() {
+  errorEl.hidden = true;
+  fieldEl.classList.remove("error");
+}
 
-        hideErrorState();
-        document.getElementById("example-label").classList.remove("required");
-        CustomAttribute.sendAttributeValidation(true);
-      }
+function validateAndRender(value) {
+  const error = validateInput(value);
 
-      /***************************************************************
-       * EVENT WIRING
-       ***************************************************************/
-      document.addEventListener("DOMContentLoaded", function () {
-        document
-          .getElementById("example")
-          .addEventListener("input", handleChange);
-      });
-    </script>
-  </body>
+  if (error) {
+    showError(error);
+    return false;
+  }
+
+  clearError();
+  return true;
+}
+
+// ============================
+// EVENTS
+// ============================
+
+inputEl.addEventListener("input", e => {
+  validateAndRender(e.target.value);
+  successEl.hidden = true;
+});
+
+formEl.addEventListener("submit", e => {
+  e.preventDefault();
+
+  const value = inputEl.value;
+
+  if (!validateAndRender(value)) {
+    successEl.hidden = true;
+    return;
+  }
+
+  console.log("Submitted:", value);
+
+  successEl.hidden = false;
+  inputEl.value = "";
+});
+</script>
+
+</body>
 </html>
